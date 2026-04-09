@@ -94,6 +94,7 @@ const initialState: AppState = {
   subjects: [],
   quizHistory: [],
   errorLog: [],
+  unlockedThemes: ['default', 'matrix'],
   settings: {
     theme: 'default',
     soundEnabled: true,
@@ -414,7 +415,7 @@ export const useStore = create<AppState & AppActions>()(
 
       unlockTheme: (themeId) => {
         set((s) => ({
-          settings: { ...s.settings, theme: themeId },
+          unlockedThemes: Array.from(new Set([...s.unlockedThemes, themeId])),
         }));
       },
 
