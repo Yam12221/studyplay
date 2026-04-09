@@ -38,7 +38,7 @@ export default function ThemeCanvas() {
       drops.push({
         x: i * 20,
         y: Math.random() * height,
-        speed: 2 + Math.random() * 4,
+        speed: 0.5 + Math.random() * 1.5,
         chars: Array(20).fill(0).map(() => chars[Math.floor(Math.random() * chars.length)]),
         currentChar: 0,
       });
@@ -410,7 +410,7 @@ export default function ThemeCanvas() {
 
       const time = Date.now() * 0.001;
 
-      if (Math.random() > 0.9) {
+      if (Math.random() > 0.98) {
         const glitchY = Math.random() * height;
         const glitchHeight = 5 + Math.random() * 20;
         ctx.fillStyle = Math.random() > 0.5 ? '#FFE500' : '#FF0055';

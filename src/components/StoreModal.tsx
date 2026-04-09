@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Zap, Shield, Coffee, Trophy, Check, Lock, Eye, EyeOff } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { THEMES, POWERUPS, type Theme, type PowerUp } from '@/lib/types';
@@ -23,13 +23,13 @@ export default function StoreModal() {
   const [activeTab, setActiveTab] = useState<'themes' | 'powerups'>('themes');
   const [purchaseMessage, setPurchaseMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [previewThemeId, setPreviewThemeId] = useState<string | null>(null);
-  const [originalThemeId] = useState(settings.theme);
+  const originalThemeId = useRef(settings.theme);
 
   // Al cerrar, si estamos en preview, restauramos el original después de 10 segundos
   const handleClose = () => {
     if (previewThemeId) {
       setTimeout(() => {
-        setTheme(originalThemeId);
+        setTheme(originalThemeId.current);
         setPreviewThemeId(null);
       }, 10000);
     }
@@ -58,7 +58,7 @@ export default function StoreModal() {
     e.stopPropagation();
     if (previewThemeId === themeId) {
       setPreviewThemeId(null);
-      setTheme(originalThemeId);
+      setTheme(originalThemeId.current);
     } else {
       setPreviewThemeId(themeId);
       setTheme(themeId);
