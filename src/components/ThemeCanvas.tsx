@@ -25,7 +25,7 @@ interface MatrixDrop {
 
 export default function ThemeCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
   const theme = useStore((state) => state.settings.theme);
 
   const currentTheme = THEMES.find((t) => t.id === theme) || THEMES[0];
@@ -506,7 +506,7 @@ export default function ThemeCanvas() {
       key={currentTheme.id}
       ref={canvasRef}
       className="fixed inset-0 w-full h-full -z-10"
-      style={{ opacity: 1 }}
+      style={{ opacity: 0.4 }}
     />
   );
 }
