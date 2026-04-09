@@ -67,7 +67,7 @@ export default function Sidebar() {
   );
 
   return (
-    <aside className="w-80 h-[calc(100vh-64px)] fixed left-0 top-16 bg-black/20 backdrop-blur-xl border-r border-white/10 overflow-hidden flex flex-col">
+    <aside className="hidden md:flex w-80 h-[calc(100vh-64px)] fixed left-0 top-16 bg-black/20 backdrop-blur-xl border-r border-white/10 overflow-hidden flex-col">
       <div className="p-4 border-b border-white/10">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />

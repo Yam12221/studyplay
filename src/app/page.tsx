@@ -40,7 +40,7 @@ export default function Home() {
           <Sidebar />
         )}
 
-        <main className={`flex-1 ${currentView !== 'quiz' && currentView !== 'dashboard' ? 'ml-80' : ''}`}>
+        <main className={`flex-1 ${(currentView !== 'quiz' && currentView !== 'dashboard') ? 'md:ml-80' : ''}`}>
           {currentView === 'notes' && <NoteEditor />}
           {currentView === 'quiz' && <QuizMode />}
           {currentView === 'dashboard' && <ProgressDashboard />}
