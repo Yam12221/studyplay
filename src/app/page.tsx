@@ -31,7 +31,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-hidden">
+    <div className="min-h-screen bg-transparent overflow-hidden">
       <ThemeCanvas />
       <Header />
 

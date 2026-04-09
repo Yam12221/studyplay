@@ -503,9 +503,10 @@ export default function ThemeCanvas() {
 
   return (
     <canvas
+      key={currentTheme.id}
       ref={canvasRef}
       className="fixed inset-0 w-full h-full -z-10"
-      style={{ opacity: 0.8 }}
+      style={{ opacity: 1 }}
     />
   );
 }
