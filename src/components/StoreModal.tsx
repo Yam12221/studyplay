@@ -25,10 +25,13 @@ export default function StoreModal() {
   const [previewThemeId, setPreviewThemeId] = useState<string | null>(null);
   const [originalThemeId] = useState(settings.theme);
 
-  // Al cerrar, si estamos en preview, restauramos el original
+  // Al cerrar, si estamos en preview, restauramos el original después de 10 segundos
   const handleClose = () => {
     if (previewThemeId) {
-      setTheme(originalThemeId);
+      setTimeout(() => {
+        setTheme(originalThemeId);
+        setPreviewThemeId(null);
+      }, 10000);
     }
     setStoreOpen(false);
   };

@@ -506,7 +506,7 @@ export default function ThemeCanvas() {
       key={currentTheme.id}
       ref={canvasRef}
       className="fixed inset-0 w-full h-full -z-10"
-      style={{ opacity: 0.4 }}
+      style={{ opacity: 0.15 }}
     />
   );
 }
