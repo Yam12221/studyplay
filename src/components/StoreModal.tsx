@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { X, Zap, Shield, Coffee, Trophy, Check, Lock, Eye, EyeOff } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { THEMES, POWERUPS, type Theme, type PowerUp } from '@/lib/types';
@@ -12,25 +12,26 @@ export default function StoreModal() {
     user,
     spendCoins,
     setTheme,
+    previewTheme,
     unlockTheme,
     activateXPBoost,
     activateStreakShield,
     useRestDay,
     settings,
     unlockedThemes,
+    lastConfirmedTheme,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'themes' | 'powerups'>('themes');
   const [purchaseMessage, setPurchaseMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [previewThemeId, setPreviewThemeId] = useState<string | null>(null);
-  const originalThemeId = useRef(settings.theme);
+  const [currentPreviewId, setCurrentPreviewId] = useState<string | null>(null);
 
-  // Al cerrar, si estamos en preview, restauramos el original después de 10 segundos
   const handleClose = () => {
-    if (previewThemeId) {
+    if (currentPreviewId) {
+      // Si cerramos con preview activo, dura 10 segundos antes de volver al confirmado
       setTimeout(() => {
-        setTheme(originalThemeId.current);
-        setPreviewThemeId(null);
+        previewTheme(null); // Esto usa lastConfirmedTheme internamente
+        setCurrentPreviewId(null);
       }, 10000);
     }
     setStoreOpen(false);
@@ -41,27 +42,27 @@ export default function StoreModal() {
 
     if (isAlreadyUnlocked) {
       setTheme(theme.id);
-      setPreviewThemeId(null);
+      setCurrentPreviewId(null);
       showMessage('success', `¡${theme.name} activado!`);
     } else if (user.coins >= theme.price) {
       spendCoins(theme.price);
       unlockTheme(theme.id);
       setTheme(theme.id);
-      setPreviewThemeId(null);
+      setCurrentPreviewId(null);
       showMessage('success', `¡${theme.name} desbloqueado y activado!`);
     } else {
       showMessage('error', 'Coins insuficientes');
     }
   };
 
-  const handlePreview = (e: React.MouseEvent, themeId: string) => {
+  const handlePreviewToggle = (e: React.MouseEvent, themeId: string) => {
     e.stopPropagation();
-    if (previewThemeId === themeId) {
-      setPreviewThemeId(null);
-      setTheme(originalThemeId.current);
+    if (currentPreviewId === themeId) {
+      setCurrentPreviewId(null);
+      previewTheme(null);
     } else {
-      setPreviewThemeId(themeId);
-      setTheme(themeId);
+      setCurrentPreviewId(themeId);
+      previewTheme(themeId);
     }
   };
 
@@ -159,15 +160,15 @@ export default function StoreModal() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {THEMES.map((theme) => {
                 const isOwned = unlockedThemes.includes(theme.id);
-                const isActive = settings.theme === theme.id && !previewThemeId;
-                const isPreviewing = previewThemeId === theme.id;
+                const isConfirmedActive = lastConfirmedTheme === theme.id && !currentPreviewId;
+                const isPreviewing = currentPreviewId === theme.id;
                 
                 return (
                   <div
                     key={theme.id}
                     onClick={() => handlePurchaseTheme(theme)}
                     className={`group relative p-4 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
-                      isActive
+                      isConfirmedActive
                         ? 'border-primary bg-primary/10'
                         : isPreviewing
                         ? 'border-yellow-500 bg-yellow-500/10 scale-[1.02]'
@@ -181,44 +182,38 @@ export default function StoreModal() {
                       
                       <div className="relative z-10 flex flex-col items-center gap-2">
                         <div className="w-12 h-12 rounded-full blur-xl animate-pulse" style={{ backgroundColor: theme.primaryColor }} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">{theme.animationType}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">{theme.id === 'matrix' ? 'Emerald Nebula' : theme.animationType}</span>
                       </div>
 
-                      {/* Botón de Vista Previa */}
                       {!isOwned && (
                         <button
-                          onClick={(e) => handlePreview(e, theme.id)}
+                          onClick={(e) => handlePreviewToggle(e, theme.id)}
                           className={`absolute bottom-2 right-2 p-2 rounded-lg backdrop-blur-md transition-all ${
                             isPreviewing ? 'bg-yellow-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
                           }`}
-                          title="Vista Previa"
                         >
                           {isPreviewing ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       )}
 
-                      {isActive && (
+                      {isConfirmedActive && (
                         <div className="absolute top-2 right-2 p-1.5 bg-primary rounded-full shadow-lg">
                           <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-
-                      {!isOwned && !isPreviewing && (
-                        <div className="absolute top-2 left-2 p-1.5 bg-black/40 rounded-full backdrop-blur-sm">
-                          <Lock className="w-3 h-3 text-white/40" />
                         </div>
                       )}
                     </div>
 
                     <div className="flex items-center justify-between px-1">
                       <div>
-                        <h4 className="text-white font-bold">{theme.name}</h4>
-                        <p className="text-[10px] text-white/40 uppercase font-medium">{isPreviewing ? 'Previsualizando' : isOwned ? 'En propiedad' : 'Bloqueado'}</p>
+                        <h4 className="text-white font-bold">{theme.id === 'matrix' ? 'Emerald Moss' : theme.name}</h4>
+                        <p className="text-[10px] text-white/40 uppercase font-medium">
+                          {isPreviewing ? 'Previsualizando' : isOwned ? 'En propiedad' : 'Bloqueado'}
+                        </p>
                       </div>
                       <div className="text-right">
                         {isOwned ? (
-                          <span className={`text-xs font-bold ${isActive ? 'text-primary' : 'text-green-400'}`}>
-                            {isActive ? 'ACTIVO' : 'USAR'}
+                          <span className={`text-xs font-bold ${isConfirmedActive ? 'text-primary' : 'text-green-400'}`}>
+                            {isConfirmedActive ? 'ACTIVO' : 'USAR'}
                           </span>
                         ) : (
                           <div className="flex items-center gap-1 text-yellow-400 font-black">
@@ -274,10 +269,10 @@ export default function StoreModal() {
 
         <div className="p-4 border-t border-white/10 bg-black/20">
           <div className="flex items-center justify-between text-xs px-2">
-            <span className="text-white/40 font-medium">✨ Los temas desbloqueados se guardan en tu cuenta permanentemente</span>
+            <span className="text-white/40 font-medium">✨ Temas ahora con previsualización persistente de 10s</span>
             <div className="flex items-center gap-2 text-yellow-400 bg-yellow-400/10 px-3 py-1.5 rounded-full border border-yellow-400/20">
               <Trophy className="w-3.5 h-3.5" />
-              <span className="font-bold tracking-tight">Coins: {user.coins}</span>
+              <span className="font-bold tracking-tight">Balance: {user.coins}</span>
             </div>
           </div>
         </div>

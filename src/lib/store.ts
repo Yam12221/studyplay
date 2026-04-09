@@ -63,6 +63,7 @@ interface AppActions {
 
   // Settings actions
   setTheme: (themeId: string) => void;
+  previewTheme: (themeId: string | null) => void;
   unlockTheme: (themeId: string) => void;
   setSoundEnabled: (enabled: boolean) => void;
   toggleSound: (soundId: string) => void;
@@ -95,6 +96,7 @@ const initialState: AppState = {
   quizHistory: [],
   errorLog: [],
   unlockedThemes: ['default', 'matrix'],
+  lastConfirmedTheme: 'default',
   settings: {
     theme: 'default',
     soundEnabled: true,
@@ -410,6 +412,13 @@ export const useStore = create<AppState & AppActions>()(
       setTheme: (themeId) => {
         set((s) => ({
           settings: { ...s.settings, theme: themeId },
+          lastConfirmedTheme: themeId,
+        }));
+      },
+
+      previewTheme: (themeId) => {
+        set((s) => ({
+          settings: { ...s.settings, theme: themeId || s.lastConfirmedTheme },
         }));
       },
 

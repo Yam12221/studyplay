@@ -84,6 +84,7 @@ export interface AppState {
   quizHistory: Quiz[];
   errorLog: ErrorLogEntry[];
   unlockedThemes: string[];
+  lastConfirmedTheme: string;
   settings: AppSettings;
   activeNoteId: string | null;
   currentView: 'notes' | 'quiz' | 'dashboard' | 'focus';

@@ -31,16 +31,15 @@ export default function ThemeCanvas() {
   const currentTheme = THEMES.find((t) => t.id === theme) || THEMES[0];
 
   const drawMatrix = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    const drops: MatrixDrop[] = [];
-    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789';
-
-    for (let i = 0; i < width / 20; i++) {
-      drops.push({
-        x: i * 20,
+    const particles: any[] = [];
+    for (let i = 0; i < 50; i++) {
+      particles.push({
+        x: Math.random() * width,
         y: Math.random() * height,
-        speed: 0.5 + Math.random() * 1.5,
-        chars: Array(20).fill(0).map(() => chars[Math.floor(Math.random() * chars.length)]),
-        currentChar: 0,
+        size: 1 + Math.random() * 2,
+        speedX: (Math.random() - 0.5) * 0.2,
+        speedY: Math.random() * 0.5 + 0.1,
+        opacity: Math.random() * 0.5,
       });
     }
 
@@ -48,27 +47,18 @@ export default function ThemeCanvas() {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
       ctx.fillRect(0, 0, width, height);
 
-      ctx.font = '16px monospace';
+      particles.forEach((p) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 255, 128, ${p.opacity})`;
+        ctx.fill();
 
-      drops.forEach((drop) => {
-        const char = drop.chars[drop.currentChar];
-        ctx.fillStyle = '#00FF00';
-        ctx.fillText(char, drop.x, drop.y);
+        p.x += p.speedX;
+        p.y += p.speedY;
 
-        ctx.fillStyle = '#003300';
-        for (let i = 0; i < drop.currentChar; i++) {
-          ctx.fillText(drop.chars[i], drop.x, drop.y - (drop.currentChar - i) * 16);
-        }
-
-        drop.y += drop.speed;
-        if (drop.y > height) {
-          drop.y = 0;
-          drop.currentChar = 0;
-          drop.chars = Array(20).fill(0).map(() => chars[Math.floor(Math.random() * chars.length)]);
-        }
-        if (drop.currentChar < 20) {
-          drop.currentChar++;
-        }
+        if (p.y > height) p.y = -10;
+        if (p.x > width) p.x = 0;
+        if (p.x < 0) p.x = width;
       });
 
       animationRef.current = requestAnimationFrame(animate);
