@@ -22,6 +22,7 @@ export default function NoteEditor() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingMessage, setGeneratingMessage] = useState('');
   const [showAttachments, setShowAttachments] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const activeNote = subjects
     .flatMap((s) => s.notes)
@@ -136,11 +137,28 @@ export default function NoteEditor() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAttachments(!showAttachments)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 transition-colors"
+            disabled={activeNote.attachments.length === 0}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
+              activeNote.attachments.length === 0 
+                ? 'opacity-30 cursor-not-allowed bg-white/5' 
+                : 'bg-white/10 hover:bg-white/20 text-white'
+            }`}
+            title={activeNote.attachments.length === 0 ? 'Sin imágenes' : 'Ver imágenes'}
           >
             <Image className="w-4 h-4" />
             <span className="text-sm">{activeNote.attachments.length}</span>
           </button>
+          
+          <label className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 cursor-pointer transition-colors border border-white/5">
+            <Upload className="w-4 h-4" />
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
           <button
             onClick={handleDelete}
             className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
@@ -186,27 +204,49 @@ export default function NoteEditor() {
       )}
 
       {showAttachments && activeNote.attachments.length > 0 && (
-        <div className="p-4 border-b border-white/10">
+        <div className="p-4 border-b border-white/10 bg-black/20">
           <div className="flex items-center gap-4 flex-wrap">
             {activeNote.attachments.map((attachment, index) => (
               <div key={index} className="relative group">
                 <img
                   src={attachment}
                   alt={`Attachment ${index + 1}`}
-                  className="w-20 h-20 object-cover rounded-lg"
+                  onClick={() => setSelectedImage(attachment)}
+                  className="w-24 h-24 object-cover rounded-xl cursor-zoom-in border border-white/10 group-hover:border-primary/50 transition-all"
                 />
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     const newAttachments = activeNote.attachments.filter((_, i) => i !== index);
                     updateNote(activeSubject!.id, activeNoteId!, { attachments: newAttachments });
                   }}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
                 >
                   <X className="w-4 h-4 text-white" />
                 </button>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Full Screen Image Preview Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-200"
+          onClick={() => setSelectedImage(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            onClick={() => setSelectedImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <img
+            src={selectedImage}
+            alt="Preview"
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
+          />
         </div>
       )}
 
@@ -247,19 +287,9 @@ Puedes usar:
 - - Viñetas para listas
 - ## Encabezados para organizar
 
-Adjunta imagenes con el boton de subir o arrastra archivos aqui."
+Adjunta imagenes con el boton de subir arriba o arrastra archivos aqui."
               className="w-full min-h-[400px] p-4 bg-white/5 rounded-xl border border-white/10 text-white placeholder:text-white/30 resize-none focus:outline-none focus:border-primary/50 transition-colors leading-relaxed"
             />
-            <label className="absolute bottom-4 right-4 p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer transition-colors">
-              <Upload className="w-5 h-5 text-white/50" />
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
           </div>
 
           <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/10">
