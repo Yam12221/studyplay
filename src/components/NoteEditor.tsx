@@ -56,7 +56,7 @@ export default function NoteEditor() {
       }
     }, 1000);
     return () => clearTimeout(debounce);
-  }, [title, content]);
+  }, [title, content, activeNoteId, activeSubject, activeNote?.title, activeNote?.content, handleSave]);
 
   const handleDelete = () => {
     if (!activeNoteId || !activeSubject) return;

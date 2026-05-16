@@ -1,15 +1,5 @@
 import type { Question } from './types';
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-
-interface GroqResponse {
-  questions: {
-    text: string;
-    options: string[];
-    correctIndex: number;
-  }[];
-}
-
 const FALLBACK_QUESTIONS: Question[][] = [
   [
     { id: '1', text: '¿Cuál es el concepto principal del tema?', options: ['Opción A', 'Opción B', 'Opción C', 'Opción D'], correctIndex: 0 },
@@ -27,98 +17,49 @@ const FALLBACK_QUESTIONS: Question[][] = [
   ],
 ];
 
-export async function generateQuiz(noteContent: string, noteTitle: string): Promise<Question[]> {
-  const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
+function getFallbackQuestions(): Question[] {
+  const randomIndex = Math.floor(Math.random() * FALLBACK_QUESTIONS.length);
+  return FALLBACK_QUESTIONS[randomIndex].map((q) => ({
+    ...q,
+    id: crypto.randomUUID(),
+  }));
+}
 
-  if (!apiKey || apiKey === 'your-groq-api-key') {
-    console.log('No Groq API key found, using fallback questions');
-    const randomIndex = Math.floor(Math.random() * FALLBACK_QUESTIONS.length);
-    return FALLBACK_QUESTIONS[randomIndex].map((q) => ({
-      ...q,
-      id: crypto.randomUUID(),
-    }));
+export async function generateQuiz(noteContent: string, noteTitle: string): Promise<Question[]> {
+  // Skip API call if note content is too short
+  if (!noteContent || noteContent.trim().length < 20) {
+    console.log('Note content too short, using fallback questions');
+    return getFallbackQuestions();
   }
 
-  const prompt = `Eres un profesor experto. Genera 5 preguntas de opción múltiple desafiantes y educativas basadas en el siguiente contenido de estudio.
-
-Título: ${noteTitle}
-
-Contenido:
-${noteContent}
-
-Requisitos:
-- Las preguntas deben ser desafiantes, no triviales
-- Incluir conceptos clave y aplicaciones prácticas
-- Mezclar preguntas de recuerdo, comprensión y análisis
-- Las opciones deben ser plausibles pero con una claramente correcta
-- El campo "correctIndex" indica el índice (0-3) de la respuesta correcta
-
-Formato JSON obligatorio:
-{
-  "questions": [
-    {
-      "text": "Pregunta",
-      "options": ["Opción A", "Opción B", "Opción C", "Opción D"],
-      "correctIndex": 0
-    }
-  ]
-}`;
-
   try {
-    const response = await fetch(GROQ_API_URL, {
+    const response = await fetch('/api/quiz', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          {
-            role: 'system',
-            content: 'Eres un profesor experto que genera preguntas de quiz educativas y desafiantes. Responde SOLO con JSON válido.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        noteContent: noteContent.slice(0, 4000), // Limit content size
+        noteTitle,
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Groq API error: ${response.status}`);
-    }
-
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
 
-    if (!content) {
-      throw new Error('No content in response');
+    if (!response.ok || data.fallback) {
+      console.warn('Quiz API returned fallback:', data.error);
+      return getFallbackQuestions();
     }
 
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response');
+    if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+      console.warn('Invalid quiz response format');
+      return getFallbackQuestions();
     }
 
-    const parsed: GroqResponse = JSON.parse(jsonMatch[0]);
-
-    return parsed.questions.map((q, index) => ({
-      id: crypto.randomUUID(),
-      text: q.text,
-      options: q.options,
-      correctIndex: q.correctIndex,
-    }));
+    return data.questions;
   } catch (error) {
-    console.error('Groq API error:', error);
-    const randomIndex = Math.floor(Math.random() * FALLBACK_QUESTIONS.length);
-    return FALLBACK_QUESTIONS[randomIndex].map((q) => ({
-      ...q,
-      id: crypto.randomUUID(),
-    }));
+    console.error('Error generating quiz:', error);
+    return getFallbackQuestions();
   }
 }
 
