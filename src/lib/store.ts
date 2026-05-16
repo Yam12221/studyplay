@@ -215,13 +215,12 @@ export const useStore = create<AppState & AppActions>()(
 
         set({ user: updatedUser });
 
-        // Sync to Supabase
+        // Sync to Supabase - handle error to prevent blocking
         supabase.from('user_stats').upsert([{
-          id: undefined, // Will be handled by the record fetch or single row policy
           xp: newXP,
           level: newLevel,
           coins: updatedUser.coins,
-        }]).then();
+        }]).catch(err => console.warn('Sync user_stats failed:', err));
 
         return { newXP, newLevel, leveledUp };
       },
@@ -352,7 +351,7 @@ export const useStore = create<AppState & AppActions>()(
           activeNoteId: newNote.id,
         }));
 
-        // Sync to Supabase
+        // Sync to Supabase - handle error to prevent blocking
         supabase.from('notes').insert([{
           id: newNote.id,
           subject_id: subjectId,
@@ -360,10 +359,14 @@ export const useStore = create<AppState & AppActions>()(
           content: newNote.content,
           quiz_count: 0,
           correct_rate: 0
-        }]).then();
+        }]).catch(err => console.warn('Sync note failed:', err));
 
-        get().addXP(50);
-        get().addCoins(10);
+        try {
+          get().addXP(50);
+          get().addCoins(10);
+        } catch (e) {
+          console.warn('Stats update failed:', e);
+        }
       },
 
       updateNote: (subjectId, noteId, updates) => {
