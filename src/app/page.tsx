@@ -12,12 +12,13 @@ import ThemeCanvas from '@/components/ThemeCanvas';
 import { useStore } from '@/lib/store';
 
 export default function Home() {
-  const { currentView, setCurrentView, user } = useStore();
+  const { currentView, setCurrentView, fetchInitialData } = useStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   if (!mounted) {
     return (

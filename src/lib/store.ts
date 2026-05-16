@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { supabase } from '@/integrations/supabase/client';
 import type { AppState, Subject, Note, Quiz, ErrorLogEntry, Question } from './types';
 
 const calculateLevel = (xp: number): number => {
@@ -34,6 +35,7 @@ interface AppActions {
   activateStreakShield: () => void;
   activateXPBoost: () => void;
   useRestDay: () => void;
+  fetchInitialData: () => Promise<void>;
 
   // Subject actions
   addSubject: (subject: Omit<Subject, 'notes'>) => void;
@@ -117,6 +119,68 @@ export const useStore = create<AppState & AppActions>()(
     (set, get) => ({
       ...initialState,
 
+      fetchInitialData: async () => {
+        try {
+          // Fetch user stats
+          const { data: statsData } = await supabase.from('user_stats').select('*').single();
+          if (statsData) {
+            set((s) => ({
+              user: {
+                ...s.user,
+                xp: statsData.xp,
+                level: statsData.level,
+                coins: statsData.coins,
+                streak: statsData.streak,
+                streakShield: statsData.streak_shield,
+                maxStreak: statsData.max_streak,
+                lastStudyDate: statsData.last_study_date,
+                xpMultiplier: statsData.xp_multiplier,
+                xpMultiplierExpiry: statsData.xp_multiplier_expiry,
+                focusMinutes: statsData.focus_minutes,
+                totalQuizzesCompleted: statsData.total_quizzes_completed,
+                totalCorrectAnswers: statsData.total_correct_answers,
+                totalQuestionsAnswered: statsData.total_questions_answered,
+              }
+            }));
+          } else {
+            // Create initial stats if none exist
+            await supabase.from('user_stats').insert([{
+              xp: initialState.user.xp,
+              level: initialState.user.level,
+              coins: initialState.user.coins,
+            }]);
+          }
+
+          // Fetch subjects
+          const { data: subjectsData } = await supabase.from('subjects').select('*');
+          if (subjectsData) {
+            const formattedSubjects: Subject[] = await Promise.all(subjectsData.map(async (sub) => {
+              const { data: notesData } = await supabase.from('notes').select('*').eq('subject_id', sub.id);
+              return {
+                ...sub,
+                notes: (notesData || []).map(n => ({
+                  ...n,
+                  subjectId: n.subject_id,
+                  createdAt: n.created_at,
+                  updatedAt: n.updated_at,
+                  quizCount: n.quiz_count,
+                  correctRate: n.correct_rate,
+                }))
+              };
+            }));
+            set({ subjects: formattedSubjects });
+          }
+
+          // Fetch unlocked themes
+          const { data: themesData } = await supabase.from('unlocked_themes').select('theme_id');
+          if (themesData) {
+            set({ unlockedThemes: Array.from(new Set(['default', 'matrix', ...themesData.map(t => t.theme_id)])) });
+          }
+        } catch (error) {
+          console.error('Error fetching initial data:', error);
+        }
+      },
+
       addXP: (amount: number) => {
         const state = get();
         let multiplier = 1;
@@ -128,14 +192,22 @@ export const useStore = create<AppState & AppActions>()(
         const newLevel = calculateLevel(newXP);
         const leveledUp = newLevel > state.user.level;
 
-        set((s) => ({
-          user: {
-            ...s.user,
-            xp: newXP,
-            level: newLevel,
-            coins: s.user.coins + Math.floor(actualAmount / 10),
-          },
-        }));
+        const updatedUser = {
+          ...state.user,
+          xp: newXP,
+          level: newLevel,
+          coins: state.user.coins + Math.floor(actualAmount / 10),
+        };
+
+        set({ user: updatedUser });
+
+        // Sync to Supabase
+        supabase.from('user_stats').upsert([{
+          id: undefined, // Will be handled by the record fetch or single row policy
+          xp: newXP,
+          level: newLevel,
+          coins: updatedUser.coins,
+        }]).then();
 
         return { newXP, newLevel, leveledUp };
       },
@@ -222,6 +294,14 @@ export const useStore = create<AppState & AppActions>()(
         set((s) => ({
           subjects: [...s.subjects, newSubject],
         }));
+        
+        // Sync to Supabase
+        supabase.from('subjects').insert([{
+          id: subject.id,
+          name: subject.name,
+          color: subject.color,
+          icon: subject.icon
+        }]).then();
       },
 
       updateSubject: (id, updates) => {
@@ -236,6 +316,9 @@ export const useStore = create<AppState & AppActions>()(
         set((s) => ({
           subjects: s.subjects.filter((sub) => sub.id !== id),
         }));
+
+        // Sync to Supabase
+        supabase.from('subjects').delete().eq('id', id).then();
       },
 
       addNote: (subjectId, note) => {
@@ -254,6 +337,17 @@ export const useStore = create<AppState & AppActions>()(
           ),
           activeNoteId: newNote.id,
         }));
+
+        // Sync to Supabase
+        supabase.from('notes').insert([{
+          id: newNote.id,
+          subject_id: subjectId,
+          title: newNote.title,
+          content: newNote.content,
+          quiz_count: 0,
+          correct_rate: 0
+        }]).then();
+
         get().addXP(50);
         get().addCoins(10);
       },
@@ -273,6 +367,18 @@ export const useStore = create<AppState & AppActions>()(
               : sub
           ),
         }));
+
+        // Sync to Supabase
+        const dbUpdates: any = {};
+        if (updates.title !== undefined) dbUpdates.title = updates.title;
+        if (updates.content !== undefined) dbUpdates.content = updates.content;
+        if (updates.quizCount !== undefined) dbUpdates.quiz_count = updates.quizCount;
+        if (updates.correctRate !== undefined) dbUpdates.correct_rate = updates.correctRate;
+        if (updates.attachments !== undefined) dbUpdates.attachments = updates.attachments;
+
+        if (Object.keys(dbUpdates).length > 0) {
+          supabase.from('notes').update(dbUpdates).eq('id', noteId).then();
+        }
       },
 
       deleteNote: (subjectId, noteId) => {
@@ -284,6 +390,9 @@ export const useStore = create<AppState & AppActions>()(
           ),
           activeNoteId: s.activeNoteId === noteId ? null : s.activeNoteId,
         }));
+
+        // Sync to Supabase
+        supabase.from('notes').delete().eq('id', noteId).then();
       },
 
       startQuiz: (quizData) => {
@@ -426,6 +535,9 @@ export const useStore = create<AppState & AppActions>()(
         set((s) => ({
           unlockedThemes: Array.from(new Set([...s.unlockedThemes, themeId])),
         }));
+
+        // Sync to Supabase
+        supabase.from('unlocked_themes').insert([{ theme_id: themeId }]).then();
       },
 
       setSoundEnabled: (enabled) => {
