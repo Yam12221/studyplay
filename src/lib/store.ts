@@ -121,60 +121,74 @@ export const useStore = create<AppState & AppActions>()(
 
       fetchInitialData: async () => {
         try {
-          // Fetch user stats
-          const { data: statsData } = await supabase.from('user_stats').select('*').single();
-          if (statsData) {
+          // Fetch user stats - use select().limit(1) instead of .single() to avoid 406/PGRST116 errors on empty tables
+          const { data: statsArray, error: statsError } = await supabase.from('user_stats').select('*').limit(1);
+          
+          if (statsArray && statsArray.length > 0) {
+            const statsData = statsArray[0];
             set((s) => ({
               user: {
                 ...s.user,
-                xp: statsData.xp,
-                level: statsData.level,
-                coins: statsData.coins,
-                streak: statsData.streak,
-                streakShield: statsData.streak_shield,
-                maxStreak: statsData.max_streak,
-                lastStudyDate: statsData.last_study_date,
-                xpMultiplier: statsData.xp_multiplier,
-                xpMultiplierExpiry: statsData.xp_multiplier_expiry,
-                focusMinutes: statsData.focus_minutes,
-                totalQuizzesCompleted: statsData.total_quizzes_completed,
-                totalCorrectAnswers: statsData.total_correct_answers,
-                totalQuestionsAnswered: statsData.total_questions_answered,
+                xp: statsData.xp ?? s.user.xp,
+                level: statsData.level ?? s.user.level,
+                coins: statsData.coins ?? s.user.coins,
+                streak: statsData.streak ?? s.user.streak,
+                streakShield: statsData.streak_shield ?? s.user.streakShield,
+                maxStreak: statsData.max_streak ?? s.user.maxStreak,
+                lastStudyDate: statsData.last_study_date ?? s.user.lastStudyDate,
+                xpMultiplier: statsData.xp_multiplier ?? s.user.xpMultiplier,
+                xpMultiplierExpiry: statsData.xp_multiplier_expiry ?? s.user.xpMultiplierExpiry,
+                focusMinutes: statsData.focus_minutes ?? s.user.focusMinutes,
+                totalQuizzesCompleted: statsData.total_quizzes_completed ?? s.user.totalQuizzesCompleted,
+                totalCorrectAnswers: statsData.total_correct_answers ?? s.user.totalCorrectAnswers,
+                totalQuestionsAnswered: statsData.total_questions_answered ?? s.user.totalQuestionsAnswered,
               }
             }));
-          } else {
-            // Create initial stats if none exist
+          } else if (!statsError) {
+            // Create initial stats only if it's truly missing and no connection error
+            const state = get();
             await supabase.from('user_stats').insert([{
-              xp: initialState.user.xp,
-              level: initialState.user.level,
-              coins: initialState.user.coins,
+              xp: state.user.xp,
+              level: state.user.level,
+              coins: state.user.coins,
             }]);
           }
 
           // Fetch subjects
           const { data: subjectsData } = await supabase.from('subjects').select('*');
-          if (subjectsData) {
+          if (subjectsData && subjectsData.length > 0) {
             const formattedSubjects: Subject[] = await Promise.all(subjectsData.map(async (sub) => {
               const { data: notesData } = await supabase.from('notes').select('*').eq('subject_id', sub.id);
               return {
                 ...sub,
                 notes: (notesData || []).map(n => ({
-                  ...n,
+                  id: n.id,
                   subjectId: n.subject_id,
+                  title: n.title,
+                  content: n.content,
                   createdAt: n.created_at,
                   updatedAt: n.updated_at,
                   quizCount: n.quiz_count,
                   correctRate: n.correct_rate,
+                  attachments: n.attachments || [],
                 }))
               };
             }));
-            set({ subjects: formattedSubjects });
+            
+            // Merge with local subjects (avoiding duplicates by ID)
+            set((s) => {
+              const existingIds = new Set(formattedSubjects.map(sub => sub.id));
+              const localOnly = s.subjects.filter(sub => !existingIds.has(sub.id));
+              return { subjects: [...formattedSubjects, ...localOnly] };
+            });
           }
 
           // Fetch unlocked themes
           const { data: themesData } = await supabase.from('unlocked_themes').select('theme_id');
           if (themesData) {
-            set({ unlockedThemes: Array.from(new Set(['default', 'matrix', ...themesData.map(t => t.theme_id)])) });
+            set((s) => ({ 
+              unlockedThemes: Array.from(new Set([...s.unlockedThemes, ...themesData.map(t => t.theme_id)])) 
+            }));
           }
         } catch (error) {
           console.error('Error fetching initial data:', error);
