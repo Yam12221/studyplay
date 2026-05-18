@@ -57,6 +57,9 @@ export default function GlobalClientEffects() {
 
   // 3. Sincronización en tiempo real (Supabase Realtime) y sondeo de respaldo (polling)
   useEffect(() => {
+    // Carga inicial inmediata
+    fetchInitialData().catch(e => console.warn("Initial fetch failed:", e));
+
     // Sondeo de respaldo cada 30 segundos (increased to reduce edit conflicts)
     const pollInterval = setInterval(() => {
       fetchInitialData().catch(e => console.warn("Polling fetch failed:", e));

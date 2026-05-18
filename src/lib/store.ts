@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { supabase } from '@/integrations/supabase/client';
 import type { AppState, Subject, Note, Quiz, ErrorLogEntry, Question } from './types';
 
@@ -119,11 +118,10 @@ let _lastLocalWriteAt = 0;
 const LOCAL_WRITE_COOLDOWN_MS = 5000; // skip remote fetches for 5s after a local write
 
 export const useStore = create<AppState & AppActions>()(
-  persist(
-    (set, get) => ({
-      ...initialState,
+  (set, get) => ({
+    ...initialState,
 
-      fetchInitialData: async () => {
+    fetchInitialData: async () => {
         // Skip remote fetch if a local write happened recently to prevent overwriting edits
         if (Date.now() - _lastLocalWriteAt < LOCAL_WRITE_COOLDOWN_MS) {
           return;
@@ -291,7 +289,9 @@ export const useStore = create<AppState & AppActions>()(
           total_quizzes_completed: updatedUser.totalQuizzesCompleted,
           total_correct_answers: updatedUser.totalCorrectAnswers,
           total_questions_answered: updatedUser.totalQuestionsAnswered,
-        }]).catch(err => console.warn('Sync user_stats failed:', err));
+        }]).then(({ error }) => {
+          if (error) console.error('Sync user_stats failed:', error);
+        });
 
         return { newXP, newLevel, leveledUp };
       },
@@ -348,7 +348,9 @@ export const useStore = create<AppState & AppActions>()(
           max_streak: updated.maxStreak,
           last_study_date: updated.lastStudyDate,
           streak_shield: updated.streakShield,
-        }]).catch(err => console.warn('Sync streak failed:', err));
+        }]).then(({ error }) => {
+          if (error) console.error('Sync streak failed:', error);
+        });
       },
 
       activateStreakShield: () => {
@@ -395,7 +397,9 @@ export const useStore = create<AppState & AppActions>()(
           name: subject.name,
           color: subject.color,
           icon: subject.icon
-        }]).then();
+        }]).then(({ error }) => {
+          if (error) console.error('Sync subject failed:', error);
+        });
       },
 
       updateSubject: (id, updates) => {
@@ -413,7 +417,9 @@ export const useStore = create<AppState & AppActions>()(
         }));
 
         // Sync to Supabase
-        supabase.from('subjects').delete().eq('id', id).then();
+        supabase.from('subjects').delete().eq('id', id).then(({ error }) => {
+          if (error) console.error('Delete subject failed:', error);
+        });
       },
 
       addNote: (subjectId, note) => {
@@ -442,7 +448,9 @@ export const useStore = create<AppState & AppActions>()(
           content: newNote.content,
           quiz_count: 0,
           correct_rate: 0
-        }]).catch(err => console.warn('Sync note failed:', err));
+        }]).then(({ error }) => {
+          if (error) console.error('Sync note failed:', error);
+        });
 
         try {
           get().addXP(50);
@@ -479,7 +487,9 @@ export const useStore = create<AppState & AppActions>()(
         if (updates.attachments !== undefined) dbUpdates.attachments = updates.attachments;
 
         if (Object.keys(dbUpdates).length > 0) {
-          supabase.from('notes').update(dbUpdates).eq('id', noteId).then();
+          supabase.from('notes').update(dbUpdates).eq('id', noteId).then(({ error }) => {
+            if (error) console.error('Update note failed:', error);
+          });
         }
       },
 
@@ -495,7 +505,9 @@ export const useStore = create<AppState & AppActions>()(
         }));
 
         // Sync to Supabase
-        supabase.from('notes').delete().eq('id', noteId).then();
+        supabase.from('notes').delete().eq('id', noteId).then(({ error }) => {
+          if (error) console.error('Delete note failed:', error);
+        });
       },
 
       startQuiz: (quizData) => {
@@ -640,7 +652,9 @@ export const useStore = create<AppState & AppActions>()(
         }));
 
         // Sync to Supabase
-        supabase.from('unlocked_themes').insert([{ theme_id: themeId }]).then();
+        supabase.from('unlocked_themes').insert([{ theme_id: themeId }]).then(({ error }) => {
+          if (error) console.error('Unlock theme failed:', error);
+        });
       },
 
       setSoundEnabled: (enabled) => {
@@ -692,11 +706,7 @@ export const useStore = create<AppState & AppActions>()(
           user: { ...s.user, totalQuestionsAnswered: s.user.totalQuestionsAnswered + 1 },
         }));
       },
-    }),
-    {
-      name: 'studyplay-storage',
-    }
-  )
+  })
 );
 
 export const getXpProgress = (xp: number, level: number) => {
