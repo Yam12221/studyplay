@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, Trash2, Wand2, Upload, X, Image } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
 import { generateQuiz, MOTIVATIONAL_MESSAGES } from '@/lib/groq';
 import type { Question } from '@/lib/types';
 
@@ -23,6 +24,7 @@ export default function NoteEditor() {
   const [generatingMessage, setGeneratingMessage] = useState('');
   const [showAttachments, setShowAttachments] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const activeNote = subjects
     .flatMap((s) => s.notes)
@@ -98,29 +100,50 @@ export default function NoteEditor() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !activeNoteId || !activeSubject) return;
 
-    // Capture IDs at call time (they won't change)
+    setIsUploading(true);
     const subjectId = activeSubject.id;
     const noteId = activeNoteId;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        // Read the LATEST attachments from the store at callback time to avoid stale closures
-        const freshNote = useStore.getState().subjects
-          .flatMap((s) => s.notes)
-          .find((n) => n.id === noteId);
-        const currentAttachments = freshNote?.attachments || [];
-        updateNote(subjectId, noteId, {
-          attachments: [...currentAttachments, result],
-        });
-      };
-      reader.readAsDataURL(file);
+    const uploadPromises = Array.from(files).map(async (file) => {
+      const fileExt = file.name.split('.').pop() || 'png';
+      const fileName = `${noteId}/${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      const { error } = await supabase.storage
+        .from('note-attachments')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Error uploading image:', error);
+        return null;
+      }
+
+      const { data } = supabase.storage
+        .from('note-attachments')
+        .getPublicUrl(fileName);
+
+      return data.publicUrl;
     });
+
+    const results = await Promise.all(uploadPromises);
+    const newUrls = results.filter((url): url is string => url !== null);
+
+    if (newUrls.length > 0) {
+      const freshNote = useStore.getState().subjects
+        .flatMap((s) => s.notes)
+        .find((n) => n.id === noteId);
+      const currentAttachments = freshNote?.attachments || [];
+      updateNote(subjectId, noteId, {
+        attachments: [...currentAttachments, ...newUrls],
+      });
+    }
+    
+    // Clear input
+    e.target.value = '';
+    setIsUploading(false);
   };
 
   if (!activeNote) {
@@ -164,14 +187,19 @@ export default function NoteEditor() {
             <span className="text-sm">{activeNote.attachments.length}</span>
           </button>
           
-          <label className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 cursor-pointer transition-colors border border-white/5">
-            <Upload className="w-4 h-4" />
+          <label className={`p-2 rounded-lg ${isUploading ? 'opacity-50 cursor-not-allowed bg-white/5' : 'bg-white/5 hover:bg-white/10 cursor-pointer'} text-white/70 transition-colors border border-white/5`}>
+            {isUploading ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
             <input
               type="file"
               accept="image/*"
               multiple
               onChange={handleFileUpload}
               className="hidden"
+              disabled={isUploading}
             />
           </label>
           <button
