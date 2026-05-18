@@ -17,7 +17,7 @@ const SOUND_URLS: Record<string, string> = {
 export default function FocusMode() {
   const { isFocusModeOpen, setFocusModeOpen, settings, toggleSound, setSoundVolume, addFocusMinute, user } = useStore();
 
-  const [pomodoroTime, setPomodoroTime] = useState(settings.pomodoroWork * 60);
+  const [pomodoroTime, setPomodoroTime] = useState((settings?.pomodoroWork ?? 25) * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
   const [sessions, setSessions] = useState(0);
@@ -57,47 +57,42 @@ export default function FocusMode() {
     });
   }, [settings.activeSounds, settings.soundEnabled]);
 
+  // Interval timer only decrements the seconds
   useEffect(() => {
-    if (isRunning && !isBreak) {
+    if (isRunning) {
       intervalRef.current = setInterval(() => {
-        setPomodoroTime((prev) => {
-          if (prev <= 1) {
-            setIsBreak(true);
-            setIsRunning(false);
-            setSessions((s) => s + 1);
-            setPomodoroTime(settings.pomodoroBreak * 60);
-            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-              new Notification('StudyPlay', { body: 'Tiempo de descanso!' });
-            }
-            return settings.pomodoroBreak * 60;
-          }
-          if (prev % 60 === 0) {
-            addFocusMinute();
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (isRunning && isBreak) {
-      intervalRef.current = setInterval(() => {
-        setPomodoroTime((prev) => {
-          if (prev <= 1) {
-            setIsBreak(false);
-            setIsRunning(false);
-            setPomodoroTime(settings.pomodoroWork * 60);
-            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-              new Notification('StudyPlay', { body: 'Tiempo de estudio!' });
-            }
-            return settings.pomodoroWork * 60;
-          }
-          return prev - 1;
-        });
+        setPomodoroTime((prev) => prev - 1);
       }, 1000);
     }
-
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isRunning, isBreak, settings.pomodoroWork, settings.pomodoroBreak]);
+  }, [isRunning]);
+
+  // Handle timer side effects (transitions and focus minutes) safely in useEffect
+  useEffect(() => {
+    if (!isRunning) return;
+
+    if (pomodoroTime <= 0) {
+      const nextBreak = !isBreak;
+      setIsBreak(nextBreak);
+      setSessions((s) => (nextBreak ? s + 1 : s));
+      setPomodoroTime((nextBreak ? (settings?.pomodoroBreak ?? 5) : (settings?.pomodoroWork ?? 25)) * 60);
+      setIsRunning(false); // Stop running on transitions as in original code
+      
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification('StudyPlay', { 
+          body: nextBreak ? 'Tiempo de descanso!' : 'Tiempo de estudio!' 
+        });
+      }
+      return;
+    }
+
+    const workTimeTotal = (settings?.pomodoroWork ?? 25) * 60;
+    if (!isBreak && pomodoroTime < workTimeTotal && pomodoroTime % 60 === 0) {
+      addFocusMinute();
+    }
+  }, [pomodoroTime, isRunning, isBreak, settings?.pomodoroWork, settings?.pomodoroBreak, addFocusMinute]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -108,7 +103,7 @@ export default function FocusMode() {
   const resetTimer = () => {
     setIsRunning(false);
     setIsBreak(false);
-    setPomodoroTime(settings.pomodoroWork * 60);
+    setPomodoroTime((settings?.pomodoroWork ?? 25) * 60);
   };
 
   const progress = isBreak

@@ -10,32 +10,40 @@ export default function FocusWidget() {
   
   const isMinimized = !isFocusModeOpen;
   const setIsMinimized = (val: boolean) => setFocusModeOpen(!val);
-  const [pomodoroTime, setPomodoroTime] = useState(settings.pomodoroWork * 60);
+  const [pomodoroTime, setPomodoroTime] = useState((settings?.pomodoroWork ?? 25) * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
   
   const intervalRef = useRef<NodeJS.Timeout>();
 
+  // Interval timer only decrements the seconds
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
-        setPomodoroTime((prev) => {
-          if (prev <= 1) {
-            setIsBreak(!isBreak);
-            const nextTime = (!isBreak ? settings.pomodoroBreak : settings.pomodoroWork) * 60;
-            return nextTime;
-          }
-          if (!isBreak && prev % 60 === 0) {
-            addFocusMinute();
-          }
-          return prev - 1;
-        });
+        setPomodoroTime((prev) => prev - 1);
       }, 1000);
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isRunning, isBreak, settings.pomodoroWork, settings.pomodoroBreak]);
+  }, [isRunning]);
+
+  // Handle timer side effects (transitions and focus minutes) safely in useEffect
+  useEffect(() => {
+    if (!isRunning) return;
+
+    if (pomodoroTime <= 0) {
+      const nextBreak = !isBreak;
+      setIsBreak(nextBreak);
+      setPomodoroTime((nextBreak ? (settings?.pomodoroBreak ?? 5) : (settings?.pomodoroWork ?? 25)) * 60);
+      return;
+    }
+
+    const workTimeTotal = (settings?.pomodoroWork ?? 25) * 60;
+    if (!isBreak && pomodoroTime < workTimeTotal && pomodoroTime % 60 === 0) {
+      addFocusMinute();
+    }
+  }, [pomodoroTime, isRunning, isBreak, settings?.pomodoroWork, settings?.pomodoroBreak, addFocusMinute]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -85,7 +93,7 @@ export default function FocusWidget() {
         {/* Controles de Timer */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <button 
-            onClick={() => { setPomodoroTime(settings.pomodoroWork * 60); setIsRunning(false); }}
+            onClick={() => { setPomodoroTime((settings?.pomodoroWork ?? 25) * 60); setIsRunning(false); setIsBreak(false); }}
             className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors"
           >
             <RotateCcw className="w-5 h-5 text-white/60" />

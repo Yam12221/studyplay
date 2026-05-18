@@ -34,12 +34,16 @@ export default function GlobalClientEffects() {
   }, []);
 
   useEffect(() => {
-    // Sincronizar estado de reproducción y volumen
-    Object.entries(audioRefs.current).forEach(([id, audio]) => {
-      const isActive = settings.activeSounds.includes(id);
-      const volume = settings.soundVolumes[id] ?? 0.5;
+    // Sincronizar estado de reproducción y volumen con validaciones defensivas
+    const activeSounds = settings?.activeSounds ?? [];
+    const soundVolumes = settings?.soundVolumes ?? {};
+    const soundEnabled = settings?.soundEnabled ?? true;
 
-      if (isActive && settings.soundEnabled) {
+    Object.entries(audioRefs.current).forEach(([id, audio]) => {
+      const isActive = activeSounds.includes(id);
+      const volume = soundVolumes[id] ?? 0.5;
+
+      if (isActive && soundEnabled) {
         audio.volume = volume;
         if (audio.paused) {
           audio.play().catch(e => console.log("Audio play blocked by browser:", e));
@@ -48,7 +52,7 @@ export default function GlobalClientEffects() {
         audio.pause();
       }
     });
-  }, [settings.activeSounds, settings.soundEnabled, settings.soundVolumes]);
+  }, [settings?.activeSounds, settings?.soundEnabled, settings?.soundVolumes]);
 
   return null;
 }
