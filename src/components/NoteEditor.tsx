@@ -108,46 +108,37 @@ export default function NoteEditor() {
     const subjectId = activeSubject.id;
     const noteId = activeNoteId;
 
-    const newUrls: string[] = [];
-
-    for (const file of Array.from(files)) {
+    const uploadPromises = Array.from(files).map(async (file) => {
       try {
-        const compressedBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const img = new window.Image();
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              let width = img.width;
-              let height = img.height;
-              const maxWidth = 800; // Resize to 800px max width
-              
-              if (width > maxWidth) {
-                height = (maxWidth / width) * height;
-                width = maxWidth;
-              }
-              
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0, width, height);
-                // Compress to WebP with 0.6 quality (very lightweight)
-                resolve(canvas.toDataURL('image/webp', 0.6));
-              } else {
-                resolve(event.target?.result as string);
-              }
-            };
-            img.src = event.target?.result as string;
-          };
-          reader.readAsDataURL(file);
-        });
+        const formData = new FormData();
+        formData.append('key', '6d207e02198a847aa98d0a2a901485a5');
+        formData.append('action', 'upload');
+        formData.append('source', file);
+        formData.append('format', 'json');
 
-        newUrls.push(compressedBase64);
-      } catch (err) {
-        console.error('Error compressing image:', err);
+        const response = await fetch('https://freeimage.host/api/1/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        const result = await response.json();
+        
+        if (result.status_code === 200 && result.image?.url) {
+          return result.image.url;
+        } else {
+          console.error('Error uploading image:', result);
+          alert('Error al subir imagen. Por favor intenta con otra.');
+          return null;
+        }
+      } catch (err: any) {
+        console.error('Fetch error:', err);
+        alert('Error de conexión al subir imagen: ' + err.message);
+        return null;
       }
-    }
+    });
+
+    const results = await Promise.all(uploadPromises);
+    const newUrls = results.filter((url): url is string => url !== null);
 
     if (newUrls.length > 0) {
       const freshNote = useStore.getState().subjects
