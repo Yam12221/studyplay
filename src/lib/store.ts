@@ -154,14 +154,41 @@ export const useStore = create<AppState & AppActions>()(
             }]);
           }
 
-          // Fetch subjects
-          const { data: subjectsData } = await supabase.from('subjects').select('*');
-          if (subjectsData && subjectsData.length > 0) {
-            const formattedSubjects: Subject[] = await Promise.all(subjectsData.map(async (sub) => {
-              const { data: notesData } = await supabase.from('notes').select('*').eq('subject_id', sub.id);
+          // Fetch subjects and notes in parallel (highly optimized, avoids N+1 queries)
+          const [subjectsResult, notesResult] = await Promise.all([
+            supabase.from('subjects').select('*'),
+            supabase.from('notes').select('*')
+          ]);
+
+          if (subjectsResult.error) {
+            console.warn('Failed to fetch subjects:', subjectsResult.error);
+          }
+          if (notesResult.error) {
+            console.warn('Failed to fetch notes:', notesResult.error);
+          }
+
+          const subjectsData = subjectsResult.data;
+          const allNotesData = notesResult.data;
+
+          // Only update local subjects/notes if we successfully retrieved them without errors
+          if (subjectsData && subjectsData.length > 0 && !notesResult.error) {
+            // Group notes by subject_id in JavaScript
+            const notesBySubject: Record<string, any[]> = {};
+            if (allNotesData) {
+              allNotesData.forEach((note) => {
+                const subId = note.subject_id;
+                if (!notesBySubject[subId]) {
+                  notesBySubject[subId] = [];
+                }
+                notesBySubject[subId].push(note);
+              });
+            }
+
+            const formattedSubjects: Subject[] = subjectsData.map((sub) => {
+              const subjectNotes = notesBySubject[sub.id] || [];
               return {
                 ...sub,
-                notes: (notesData || []).map(n => ({
+                notes: subjectNotes.map((n) => ({
                   id: n.id,
                   subjectId: n.subject_id,
                   title: n.title,
@@ -173,7 +200,7 @@ export const useStore = create<AppState & AppActions>()(
                   attachments: n.attachments || [],
                 }))
               };
-            }));
+            });
             
             // Merge with local subjects (avoiding duplicates by ID)
             set((s) => {

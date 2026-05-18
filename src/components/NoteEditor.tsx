@@ -36,11 +36,8 @@ export default function NoteEditor() {
 
   useEffect(() => {
     if (activeNote) {
-      // Only overwrite local input values if switching notes or if it's the first async load of the selected note
-      const isSwitching = activeNoteId !== loadedNoteIdRef.current;
-      const isFirstLoad = !loadedNoteIdRef.current || (loadedNoteIdRef.current === activeNoteId && !title && !content);
-      
-      if (isSwitching || isFirstLoad) {
+      // Only overwrite local input values if switching notes or if it's the first load (when loadedNoteIdRef is null)
+      if (activeNoteId !== loadedNoteIdRef.current) {
         setTitle(activeNote.title);
         setContent(activeNote.content);
         loadedNoteIdRef.current = activeNoteId;
@@ -50,7 +47,7 @@ export default function NoteEditor() {
       setContent('');
       loadedNoteIdRef.current = null;
     }
-  }, [activeNote, activeNoteId, title, content]);
+  }, [activeNote, activeNoteId]);
 
   const handleSave = useCallback(async () => {
     if (!activeNoteId || !activeSubject) return;
