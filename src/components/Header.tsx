@@ -1,14 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Flame, Store, Zap, Trophy, Crown } from 'lucide-react';
+import { Flame, Store, Zap, Trophy, Crown, RefreshCw } from 'lucide-react';
 import { useStore, getXpProgress, getTotalXpForLevel } from '@/lib/store';
 import { LEVEL_TITLES } from '@/lib/types';
 
 export default function Header() {
-  const { user, setStoreOpen, setFocusModeOpen } = useStore();
+  const { user, setStoreOpen, setFocusModeOpen, fetchInitialData } = useStore();
   const [showXPAnimation, setShowXPAnimation] = useState(false);
   const [xpPopups, setXpPopups] = useState<{ id: string; amount: number; x: number; y: number }[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await fetchInitialData();
+    } catch (e) {
+      console.warn("Manual sync failed:", e);
+    }
+    setTimeout(() => setIsSyncing(false), 800);
+  };
 
   const xpProgress = getXpProgress(user.xp, user.level);
   const levelTitle = LEVEL_TITLES.find(
@@ -53,6 +64,13 @@ export default function Header() {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
               StudyPlay
             </h1>
+            <button
+              onClick={handleSync}
+              className="ml-2 p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-all duration-200"
+              title="Sincronizar datos"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-primary' : ''}`} />
+            </button>
           </div>
         </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { useZoerIframe } from "@/hooks/useZoerIframe";
+import { supabase } from '@/integrations/supabase/client';
 
 const SOUND_URLS: Record<string, string> = {
   lofi: 'https://cdn.pixabay.com/audio/2022/10/25/audio_946ba7e4fa.mp3',
@@ -15,11 +16,11 @@ const SOUND_URLS: Record<string, string> = {
 
 export default function GlobalClientEffects() {
   useZoerIframe();
-  const { settings } = useStore();
+  const { settings, fetchInitialData } = useStore();
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
 
+  // 1. Inicializar sonidos de fondo
   useEffect(() => {
-    // Inicializar audios
     Object.entries(SOUND_URLS).forEach(([id, url]) => {
       if (!audioRefs.current[id]) {
         const audio = new Audio(url);
@@ -33,8 +34,8 @@ export default function GlobalClientEffects() {
     };
   }, []);
 
+  // 2. Sincronizar estado de reproducción y volumen de audios con validaciones defensivas
   useEffect(() => {
-    // Sincronizar estado de reproducción y volumen con validaciones defensivas
     const activeSounds = settings?.activeSounds ?? [];
     const soundVolumes = settings?.soundVolumes ?? {};
     const soundEnabled = settings?.soundEnabled ?? true;
@@ -53,6 +54,45 @@ export default function GlobalClientEffects() {
       }
     });
   }, [settings?.activeSounds, settings?.soundEnabled, settings?.soundVolumes]);
+
+  // 3. Sincronización en tiempo real (Supabase Realtime) y sondeo de respaldo (polling)
+  useEffect(() => {
+    // Sondeo de respaldo cada 15 segundos
+    const pollInterval = setInterval(() => {
+      fetchInitialData().catch(e => console.warn("Polling fetch failed:", e));
+    }, 15000);
+
+    // Suscripción en tiempo real a cambios en la base de datos de Supabase
+    const channel = supabase
+      .channel('db-realtime-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subjects' },
+        () => {
+          fetchInitialData().catch(e => console.warn("Realtime sync subjects failed:", e));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notes' },
+        () => {
+          fetchInitialData().catch(e => console.warn("Realtime sync notes failed:", e));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_stats' },
+        () => {
+          fetchInitialData().catch(e => console.warn("Realtime sync user_stats failed:", e));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(channel);
+    };
+  }, [fetchInitialData]);
 
   return null;
 }
