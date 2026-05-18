@@ -66,7 +66,9 @@ export default function FocusMode() {
             setIsRunning(false);
             setSessions((s) => s + 1);
             setPomodoroTime(settings.pomodoroBreak * 60);
-            new Notification('StudyPlay', { body: 'Tiempo de descanso!' });
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              new Notification('StudyPlay', { body: 'Tiempo de descanso!' });
+            }
             return settings.pomodoroBreak * 60;
           }
           if (prev % 60 === 0) {
@@ -82,7 +84,9 @@ export default function FocusMode() {
             setIsBreak(false);
             setIsRunning(false);
             setPomodoroTime(settings.pomodoroWork * 60);
-            new Notification('StudyPlay', { body: 'Tiempo de estudio!' });
+            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+              new Notification('StudyPlay', { body: 'Tiempo de estudio!' });
+            }
             return settings.pomodoroWork * 60;
           }
           return prev - 1;

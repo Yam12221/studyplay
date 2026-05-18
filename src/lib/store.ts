@@ -220,6 +220,16 @@ export const useStore = create<AppState & AppActions>()(
           xp: newXP,
           level: newLevel,
           coins: updatedUser.coins,
+          streak: updatedUser.streak,
+          max_streak: updatedUser.maxStreak,
+          last_study_date: updatedUser.lastStudyDate,
+          streak_shield: updatedUser.streakShield,
+          xp_multiplier: updatedUser.xpMultiplier,
+          xp_multiplier_expiry: updatedUser.xpMultiplierExpiry,
+          focus_minutes: updatedUser.focusMinutes,
+          total_quizzes_completed: updatedUser.totalQuizzesCompleted,
+          total_correct_answers: updatedUser.totalCorrectAnswers,
+          total_questions_answered: updatedUser.totalQuestionsAnswered,
         }]).catch(err => console.warn('Sync user_stats failed:', err));
 
         return { newXP, newLevel, leveledUp };
@@ -269,6 +279,15 @@ export const useStore = create<AppState & AppActions>()(
             },
           }));
         }
+
+        // Sync streak to Supabase
+        const updated = get().user;
+        supabase.from('user_stats').upsert([{
+          streak: updated.streak,
+          max_streak: updated.maxStreak,
+          last_study_date: updated.lastStudyDate,
+          streak_shield: updated.streakShield,
+        }]).catch(err => console.warn('Sync streak failed:', err));
       },
 
       activateStreakShield: () => {
@@ -364,6 +383,7 @@ export const useStore = create<AppState & AppActions>()(
         try {
           get().addXP(50);
           get().addCoins(10);
+          get().updateStreak();
         } catch (e) {
           console.warn('Stats update failed:', e);
         }
@@ -586,6 +606,7 @@ export const useStore = create<AppState & AppActions>()(
           user: { ...s.user, focusMinutes: s.user.focusMinutes + 1 },
         }));
         get().addXP(1);
+        get().updateStreak();
       },
 
       incrementQuizCompleted: () => {
