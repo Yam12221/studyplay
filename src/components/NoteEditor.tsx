@@ -125,10 +125,12 @@ export default function NoteEditor() {
         
         if (!response.ok || result.error) {
           console.error('Error uploading image:', result.error || 'Unknown error');
+          alert('Error al subir imagen: ' + (result.error || 'Error desconocido'));
           return null;
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Fetch error:', err);
+        alert('Error de conexión al subir imagen: ' + err.message);
         return null;
       }
 
