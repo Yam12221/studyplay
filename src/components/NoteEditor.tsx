@@ -109,23 +109,22 @@ export default function NoteEditor() {
     const noteId = activeNoteId;
 
     const uploadPromises = Array.from(files).map(async (file) => {
-      const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `${noteId}/${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileName', fileName);
+      formData.append('key', 'b15facc0a83a591c19426bde770c7941'); // ImgBB API Key provided by user
+      formData.append('image', file);
 
       try {
-        const response = await fetch('/api/upload', {
+        const response = await fetch('https://api.imgbb.com/1/upload', {
           method: 'POST',
           body: formData,
         });
         const result = await response.json();
         
-        if (!response.ok || result.error) {
-          console.error('Error uploading image:', result.error || 'Unknown error');
-          alert('Error al subir imagen: ' + (result.error || 'Error desconocido'));
+        if (result.success && result.data && result.data.url) {
+          return result.data.url;
+        } else {
+          console.error('Error uploading image to ImgBB:', result);
+          alert('Error al subir imagen a ImgBB. Intenta de nuevo.');
           return null;
         }
       } catch (err: any) {
@@ -133,12 +132,6 @@ export default function NoteEditor() {
         alert('Error de conexión al subir imagen: ' + err.message);
         return null;
       }
-
-      const { data } = supabase.storage
-        .from('note-attachments')
-        .getPublicUrl(fileName);
-
-      return data.publicUrl;
     });
 
     const results = await Promise.all(uploadPromises);
