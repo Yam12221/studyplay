@@ -112,12 +112,23 @@ export default function NoteEditor() {
       const fileExt = file.name.split('.').pop() || 'png';
       const fileName = `${noteId}/${Math.random().toString(36).substring(2)}.${fileExt}`;
       
-      const { error } = await supabase.storage
-        .from('note-attachments')
-        .upload(fileName, file);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileName', fileName);
 
-      if (error) {
-        console.error('Error uploading image:', error);
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        const result = await response.json();
+        
+        if (!response.ok || result.error) {
+          console.error('Error uploading image:', result.error || 'Unknown error');
+          return null;
+        }
+      } catch (err) {
+        console.error('Fetch error:', err);
         return null;
       }
 
