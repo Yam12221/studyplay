@@ -11,9 +11,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing file or fileName' }, { status: 400 });
     }
 
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
     const { data, error } = await supabaseAdmin.storage
       .from('note-attachments')
-      .upload(fileName, file, {
+      .upload(fileName, buffer, {
+        contentType: file.type,
         cacheControl: '3600',
         upsert: true
       });

@@ -109,25 +109,23 @@ export default function NoteEditor() {
     const noteId = activeNoteId;
 
     const uploadPromises = Array.from(files).map(async (file) => {
-      try {
-        const formData = new FormData();
-        formData.append('key', '6d207e02198a847aa98d0a2a901485a5');
-        formData.append('action', 'upload');
-        formData.append('source', file);
-        formData.append('format', 'json');
+      const fileExt = file.name.split('.').pop() || 'png';
+      const fileName = `${noteId}/${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileName', fileName);
 
-        const response = await fetch('https://freeimage.host/api/1/upload', {
+      try {
+        const response = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
         });
-        
         const result = await response.json();
         
-        if (result.status_code === 200 && result.image?.url) {
-          return result.image.url;
-        } else {
-          console.error('Error uploading image:', result);
-          alert('Error al subir imagen. Por favor intenta con otra.');
+        if (!response.ok || result.error) {
+          console.error('Error uploading image:', result.error || 'Unknown error');
+          alert('Error al subir imagen: ' + (result.error || 'Error desconocido'));
           return null;
         }
       } catch (err: any) {
@@ -135,6 +133,12 @@ export default function NoteEditor() {
         alert('Error de conexión al subir imagen: ' + err.message);
         return null;
       }
+
+      const { data } = supabase.storage
+        .from('note-attachments')
+        .getPublicUrl(fileName);
+
+      return data.publicUrl;
     });
 
     const results = await Promise.all(uploadPromises);
