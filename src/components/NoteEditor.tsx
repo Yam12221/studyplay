@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, Trash2, Wand2, Upload, X, Image } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { generateQuiz, MOTIVATIONAL_MESSAGES } from '@/lib/groq';
@@ -32,15 +32,25 @@ export default function NoteEditor() {
     s.notes.some((n) => n.id === activeNoteId)
   );
 
+  const loadedNoteIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (activeNote) {
-      setTitle(activeNote.title);
-      setContent(activeNote.content);
+      // Only overwrite local input values if switching notes or if it's the first async load of the selected note
+      const isSwitching = activeNoteId !== loadedNoteIdRef.current;
+      const isFirstLoad = !loadedNoteIdRef.current || (loadedNoteIdRef.current === activeNoteId && !title && !content);
+      
+      if (isSwitching || isFirstLoad) {
+        setTitle(activeNote.title);
+        setContent(activeNote.content);
+        loadedNoteIdRef.current = activeNoteId;
+      }
     } else {
       setTitle('');
       setContent('');
+      loadedNoteIdRef.current = null;
     }
-  }, [activeNote]);
+  }, [activeNote, activeNoteId, title, content]);
 
   const handleSave = useCallback(async () => {
     if (!activeNoteId || !activeSubject) return;
