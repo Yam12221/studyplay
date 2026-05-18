@@ -108,41 +108,46 @@ export default function NoteEditor() {
     const subjectId = activeSubject.id;
     const noteId = activeNoteId;
 
-    const uploadPromises = Array.from(files).map(async (file) => {
-      const fileExt = file.name.split('.').pop() || 'png';
-      const fileName = `${noteId}/${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileName', fileName);
+    const newUrls: string[] = [];
 
+    for (const file of Array.from(files)) {
       try {
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
+        const compressedBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              let width = img.width;
+              let height = img.height;
+              const maxWidth = 800; // Resize to 800px max width
+              
+              if (width > maxWidth) {
+                height = (maxWidth / width) * height;
+                width = maxWidth;
+              }
+              
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                // Compress to WebP with 0.6 quality (very lightweight)
+                resolve(canvas.toDataURL('image/webp', 0.6));
+              } else {
+                resolve(event.target?.result as string);
+              }
+            };
+            img.src = event.target?.result as string;
+          };
+          reader.readAsDataURL(file);
         });
-        const result = await response.json();
-        
-        if (!response.ok || result.error) {
-          console.error('Error uploading image:', result.error || 'Unknown error');
-          alert('Error al subir imagen: ' + (result.error || 'Error desconocido'));
-          return null;
-        }
-      } catch (err: any) {
-        console.error('Fetch error:', err);
-        alert('Error de conexión al subir imagen: ' + err.message);
-        return null;
+
+        newUrls.push(compressedBase64);
+      } catch (err) {
+        console.error('Error compressing image:', err);
       }
-
-      const { data } = supabase.storage
-        .from('note-attachments')
-        .getPublicUrl(fileName);
-
-      return data.publicUrl;
-    });
-
-    const results = await Promise.all(uploadPromises);
-    const newUrls = results.filter((url): url is string => url !== null);
+    }
 
     if (newUrls.length > 0) {
       const freshNote = useStore.getState().subjects
