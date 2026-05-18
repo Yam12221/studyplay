@@ -145,6 +145,10 @@ export default function NoteEditor() {
       updateNote(subjectId, noteId, {
         attachments: [...currentAttachments, ...newUrls],
       });
+      // Automatically show the attachments panel so user sees the image
+      alert('¡Imagen subida exitosamente!');
+    } else {
+      alert('No se pudo subir la imagen. Revisa tu conexión a internet.');
     }
     
     // Clear input
