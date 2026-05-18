@@ -57,10 +57,10 @@ export default function GlobalClientEffects() {
 
   // 3. Sincronización en tiempo real (Supabase Realtime) y sondeo de respaldo (polling)
   useEffect(() => {
-    // Sondeo de respaldo cada 15 segundos
+    // Sondeo de respaldo cada 30 segundos (increased to reduce edit conflicts)
     const pollInterval = setInterval(() => {
       fetchInitialData().catch(e => console.warn("Polling fetch failed:", e));
-    }, 15000);
+    }, 30000);
 
     // Suscripción en tiempo real a cambios en la base de datos de Supabase
     const channel = supabase

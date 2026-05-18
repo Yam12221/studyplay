@@ -114,13 +114,22 @@ const initialState: AppState = {
   isFocusModeOpen: false,
 };
 
+// Guard: timestamp of the last local write to prevent realtime/polling from overwriting in-progress edits
+let _lastLocalWriteAt = 0;
+const LOCAL_WRITE_COOLDOWN_MS = 5000; // skip remote fetches for 5s after a local write
+
 export const useStore = create<AppState & AppActions>()(
   persist(
     (set, get) => ({
       ...initialState,
 
       fetchInitialData: async () => {
+        // Skip remote fetch if a local write happened recently to prevent overwriting edits
+        if (Date.now() - _lastLocalWriteAt < LOCAL_WRITE_COOLDOWN_MS) {
+          return;
+        }
         try {
+          const currentActiveNoteId = get().activeNoteId;
           // Fetch user stats - use select().limit(1) instead of .single() to avoid 406/PGRST116 errors on empty tables
           const { data: statsArray, error: statsError } = await supabase.from('user_stats').select('*').limit(1);
           
@@ -203,10 +212,35 @@ export const useStore = create<AppState & AppActions>()(
             });
             
             // Merge with local subjects (avoiding duplicates by ID)
+            // IMPORTANT: preserve the locally-edited note to avoid overwriting in-progress edits
             set((s) => {
               const existingIds = new Set(formattedSubjects.map(sub => sub.id));
               const localOnly = s.subjects.filter(sub => !existingIds.has(sub.id));
-              return { subjects: [...formattedSubjects, ...localOnly] };
+              
+              let merged = [...formattedSubjects, ...localOnly];
+              
+              // If user is actively editing a note, preserve its local version
+              if (currentActiveNoteId) {
+                const localActiveNote = s.subjects
+                  .flatMap(sub => sub.notes)
+                  .find(n => n.id === currentActiveNoteId);
+                
+                if (localActiveNote) {
+                  merged = merged.map(sub => {
+                    if (sub.notes.some(n => n.id === currentActiveNoteId)) {
+                      return {
+                        ...sub,
+                        notes: sub.notes.map(n =>
+                          n.id === currentActiveNoteId ? localActiveNote : n
+                        ),
+                      };
+                    }
+                    return sub;
+                  });
+                }
+              }
+              
+              return { subjects: merged };
             });
           }
 
@@ -349,6 +383,7 @@ export const useStore = create<AppState & AppActions>()(
       },
 
       addSubject: (subject) => {
+        _lastLocalWriteAt = Date.now();
         const newSubject: Subject = { ...subject, notes: [] };
         set((s) => ({
           subjects: [...s.subjects, newSubject],
@@ -372,6 +407,7 @@ export const useStore = create<AppState & AppActions>()(
       },
 
       deleteSubject: (id) => {
+        _lastLocalWriteAt = Date.now();
         set((s) => ({
           subjects: s.subjects.filter((sub) => sub.id !== id),
         }));
@@ -381,6 +417,7 @@ export const useStore = create<AppState & AppActions>()(
       },
 
       addNote: (subjectId, note) => {
+        _lastLocalWriteAt = Date.now();
         const newNote: Note = {
           ...note,
           id: crypto.randomUUID(),
@@ -417,6 +454,7 @@ export const useStore = create<AppState & AppActions>()(
       },
 
       updateNote: (subjectId, noteId, updates) => {
+        _lastLocalWriteAt = Date.now();
         set((s) => ({
           subjects: s.subjects.map((sub) =>
             sub.id === subjectId
@@ -446,6 +484,7 @@ export const useStore = create<AppState & AppActions>()(
       },
 
       deleteNote: (subjectId, noteId) => {
+        _lastLocalWriteAt = Date.now();
         set((s) => ({
           subjects: s.subjects.map((sub) =>
             sub.id === subjectId

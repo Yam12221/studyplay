@@ -102,12 +102,20 @@ export default function NoteEditor() {
     const files = e.target.files;
     if (!files || !activeNoteId || !activeSubject) return;
 
+    // Capture IDs at call time (they won't change)
+    const subjectId = activeSubject.id;
+    const noteId = activeNoteId;
+
     Array.from(files).forEach((file) => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
-        const currentAttachments = activeNote?.attachments || [];
-        updateNote(activeSubject.id, activeNoteId, {
+        // Read the LATEST attachments from the store at callback time to avoid stale closures
+        const freshNote = useStore.getState().subjects
+          .flatMap((s) => s.notes)
+          .find((n) => n.id === noteId);
+        const currentAttachments = freshNote?.attachments || [];
+        updateNote(subjectId, noteId, {
           attachments: [...currentAttachments, result],
         });
       };
